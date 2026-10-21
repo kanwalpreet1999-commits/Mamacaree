@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mama Care – Pregnancy Care Planner</title>
+<link href="https://fonts.googleapis.com/css2?family=Young+Serif&family=Figtree:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f2f6f4;--card:#fff;--ink:#16302d;--mute:#586e6a;--line:#d8e3df;--acc:#b83562;--acc2:#1f7a6d;--soft:#e3f1ed;--warn:#fdecef;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1c1a;--card:#172826;--ink:#e6f1ee;--mute:#9db4af;--line:#2a403c;--acc:#f08aa8;--acc2:#5cc7b3;--soft:#1d3633;--warn:#3a1f29}}
+:root[data-theme="dark"]{--bg:#0f1c1a;--card:#172826;--ink:#e6f1ee;--mute:#9db4af;--line:#2a403c;--acc:#f08aa8;--acc2:#5cc7b3;--soft:#1d3633;--warn:#3a1f29}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 Figtree,system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:640px;margin:0 auto;padding:20px 16px 48px}
+h1,h2,.big{font-family:"Young Serif",Georgia,serif;font-weight:400;margin:0}
+h2{font-size:1.25rem;margin-bottom:10px}
+section{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;margin-top:14px}
+.hero{background:var(--acc2);color:#fff;border:0}
+.hero .big{font-size:3.4rem;line-height:1}
+.hero p{margin:6px 0 0;opacity:.92}
+.ticks{display:flex;gap:2px;margin-top:16px;align-items:flex-end}
+.ticks i{flex:1;height:14px;background:rgba(255,255,255,.28);border-radius:2px}
+.ticks i.on{background:#fff}.ticks i.now{height:22px;background:#ffd1df}
+.ticks i.gap{margin-left:6px}
+.tri{display:flex;justify-content:space-between;font-size:.8rem;margin-top:6px;opacity:.9}
+label,.lbl{display:block;font-weight:600;font-size:.9rem;margin:10px 0 4px}
+input,select,button{font:inherit;color:var(--ink)}
+input,select{width:100%;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--bg)}
+button{cursor:pointer;border:0;border-radius:10px;padding:11px 16px;background:var(--acc);color:#fff;font-weight:700;margin-top:12px}
+button.ghost{background:var(--soft);color:var(--ink)}
+:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
+ul{margin:0;padding-left:20px}li{margin:5px 0}
+.chk{display:flex;gap:12px;align-items:center;padding:11px 0;border-top:1px solid var(--line)}
+.chk:first-of-type{border-top:0}
+.chk input{width:22px;height:22px;accent-color:var(--acc2);flex:none}
+.chk span small{display:block;color:var(--mute)}
+.glasses{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.glasses button{margin:0;padding:0;width:34px;height:40px;background:var(--soft);border-radius:4px 4px 10px 10px}
+.glasses button.on{background:var(--acc2)}
+.pill{display:inline-block;background:var(--soft);border-radius:99px;padding:2px 10px;font-size:.8rem;font-weight:600;margin-right:6px}
+.pill.now{background:var(--acc);color:#fff}
+.ap{padding:10px 0;border-top:1px solid var(--line)}.ap:first-of-type{border-top:0}
+.ap small{color:var(--mute);display:block}
+.warn{background:var(--warn);border-color:var(--acc)}
+.row{display:flex;gap:10px}.row>div{flex:1}
+#toast{position:fixed;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom,0px));max-width:616px;margin:0 auto;background:var(--ink);color:var(--bg);padding:14px 16px;border-radius:12px;display:none;z-index:9;font-weight:600}
+.note{color:var(--mute);font-size:.85rem}
+</style>
+</head>
+<body>
+<main>
+<h1>Mama Care</h1>
+<p class="note">Your week-by-week pregnancy planner: what to do, eat, check and watch for.</p>
+
+<section id="setup">
+ <h2>Start here</h2>
+ <label for="mode">I know my…</label>
+ <select id="mode"><option value="due">Due date</option><option value="lmp">First day of last period</option></select>
+ <label for="date">Date</label>
+ <input type="date" id="date">
+ <button id="save">Save and show my plan</button>
+</section>
+
+<div id="app" hidden>
+ <section class="hero" id="hero"></section>
+ <section id="today"></section>
+ <section id="week"></section>
+ <section id="appts"></section>
+ <section class="warn" id="warn"></section>
+ <section id="rem"></section>
+ <p class="note">This planner gives general guidance only and does not replace your doctor or midwife. Follow their advice if it differs.</p>
+ <button class="ghost" id="reset">Change my date</button>
+</div>
+</main>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+const $=id=>document.getElementById(id);
+const store={get(k){try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
+const DAY=864e5;
+const sizes=[[4,'a poppy seed'],[6,'a lentil'],[8,'a raspberry'],[10,'a strawberry'],[12,'a lime'],[14,'a lemon'],[16,'an avocado'],[18,'a bell pepper'],[20,'a banana'],[22,'a papaya'],[24,'an ear of corn'],[26,'a head of lettuce'],[28,'an eggplant'],[30,'a cabbage'],[32,'a squash'],[34,'a cantaloupe'],[36,'a honeydew melon'],[38,'a pumpkin'],[40,'a small watermelon']];
+const tips={
+ 1:{name:'First trimester',care:['Start a prenatal vitamin with folic acid (400–800 mcg) if you have not already','Rest when tired; eat small, frequent meals if you feel sick','Ginger tea or crackers before getting up can ease nausea','Book your first antenatal visit','Stop alcohol, smoking and any medicine your doctor has not approved'],eat:['Leafy greens, beans and fortified cereals for folate','Protein at every meal: eggs (fully cooked), lentils, yogurt, chicken','Fluids little and often if nausea is strong']},
+ 2:{name:'Second trimester',care:['Walk or do prenatal yoga for about 30 minutes most days','Sleep on your side, with a pillow between the knees','Moisturize your belly, and wear supportive shoes and a good bra','Do pelvic floor (Kegel) exercises daily','Plan the anomaly scan and glucose test with your doctor'],eat:['Iron: spinach, dates, lean meat, lentils (with vitamin C)','Calcium: milk, yogurt, paneer, ragi, almonds','Fiber and water to prevent constipation']},
+ 3:{name:'Third trimester',care:['Count baby kicks every day from week 28','Pack your hospital bag by week 34','Write down your birth plan and save emergency numbers','Rest with your feet up; gentle walks help swelling and sleep','Learn the signs of labor and know your route to the hospital'],eat:['Smaller, more frequent meals to ease heartburn','Omega-3 sources: well-cooked fish low in mercury, walnuts, flax','Dates and plenty of fluids in the last weeks']}
+};
+const avoid='Avoid raw or undercooked meat, eggs and seafood, unpasteurized milk and cheese, high-mercury fish, unwashed produce, and more than 200 mg caffeine (about one small coffee) a day.';
+const checks=[
+ {a:6,b:8,t:'First antenatal visit',d:'Confirm pregnancy, blood group, blood pressure, history'},
+ {a:8,b:12,t:'Dating ultrasound',d:'Confirms due date and heartbeat'},
+ {a:11,b:14,t:'First-trimester screening',d:'Nuchal scan and blood test, if you choose it'},
+ {a:18,b:22,t:'Anomaly scan',d:'Detailed check of baby’s growth and organs'},
+ {a:24,b:28,t:'Glucose test',d:'Screens for gestational diabetes'},
+ {a:27,b:36,t:'Tdap vaccine',d:'Protects baby from whooping cough'},
+ {a:28,b:28,t:'Anti-D injection',d:'Only if your blood group is Rh-negative'},
+ {a:35,b:37,t:'Group B strep swab',d:'Quick swab test before delivery'},
+ {a:36,b:40,t:'Weekly visits',d:'Check baby’s position and your blood pressure'}
+];
+const warns=['Vaginal bleeding or fluid leaking','Severe headache, blurred vision or sudden swelling of face and hands','Baby moving much less than usual','Strong or constant belly pain, or regular contractions before week 37','Fever, chills, or burning when you pass urine','Vomiting so often you cannot keep fluids down','Pain, redness or swelling in one leg, or chest pain and breathlessness'];
+
+const NATIVE=!!(window.Capacitor&&Capacitor.isNativePlatform&&Capacitor.isNativePlatform());
+const MSG={vit:'Time for your prenatal vitamin.',water:'Drink a glass of water.',walk:'Take a gentle 30-minute walk.'};
+async function scheduleNative(r){
+ try{
+  const LN=window.Capacitor&&Capacitor.Plugins&&Capacitor.Plugins.LocalNotifications;
+  if(!NATIVE||!LN)return false;
+  const p=await LN.requestPermissions();if(p.display!=='granted')return false;
+  await LN.cancel({notifications:[{id:1},{id:2},{id:3}]});
+  const mk=(id,key)=>{const [h,m]=r[key].split(':').map(Number);return{id,title:'Mama Care',body:MSG[key],schedule:{on:{hour:h,minute:m},allowWhileIdle:true}}};
+  await LN.schedule({notifications:[mk(1,'vit'),mk(2,'water'),mk(3,'walk')]});
+  return true;
+ }catch(e){return false}
+}
+let st=store.get('mc-state'),timer;
+function pdate(s){const [y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d)}
+function fmt(d){return d.toLocaleDateString(undefined,{day:'numeric',month:'short',year:'numeric'})}
+function calc(){
+ const d=pdate(st.date),lmp=st.mode==='lmp'?d:new Date(d.getTime()-280*DAY);
+ const due=new Date(lmp.getTime()+280*DAY),now=new Date();now.setHours(0,0,0,0);
+ const days=Math.floor((now-lmp)/DAY);
+ return{lmp,due,week:Math.floor(days/7),day:((days%7)+7)%7,left:Math.round((due-now)/DAY)};
+}
+function toast(m){const t=$('toast');t.textContent=m;t.style.display='block';clearTimeout(t._h);t._h=setTimeout(()=>t.style.display='none',7000)}
+function render(){
+ if(!st){$('setup').hidden=false;$('app').hidden=true;return}
+ $('setup').hidden=true;$('app').hidden=false;
+ const c=calc(),w=Math.max(1,Math.min(42,c.week)),tri=w<=13?1:w<=27?2:3,T=tips[tri];
+ const size=[...sizes].reverse().find(s=>w>=s[0]);
+ let tk='';for(let i=1;i<=40;i++)tk+=`<i class="${i<w?'on':i===w?'now':''} ${i===14||i===28?'gap':''}"></i>`;
+ const status=c.week<1?'Your due date looks far ahead; check the date you entered.':c.left<0?'You are past your due date. Stay in close contact with your care team.':`${c.left} days to go · due ${fmt(c.due)}`;
+ $('hero').innerHTML=`<div class="big">Week ${w}</div><p>${T.name}${c.day?` · +${c.day} day${c.day>1?'s':''}`:''}</p><p>${status}</p>${size&&w<=40?`<p>Baby is about the size of ${size[1]}.</p>`:''}<div class="ticks" aria-hidden="true">${tk}</div><div class="tri"><span>Trimester 1</span><span>2</span><span>3</span></div>`;
+ // today
+ const k='mc-day-'+new Date().toDateString(),d=store.get(k)||{water:0};
+ const items=[['vit','Take prenatal vitamin','Folic acid, iron, calcium as your doctor advised'],['walk','Walk or stretch for 30 minutes','Gentle movement, stop if dizzy or in pain'],['meals','Eat 3 meals and 2 healthy snacks','Protein, vegetables, fruit, whole grains'],['sleep','Sleep 7–9 hours, on your left side','Nap if you need one']];
+ if(w>=28)items.push(['kick','Count baby kicks','Aim for 10 movements within 2 hours']);
+ $('today').innerHTML=`<h2>Today’s checklist</h2>`+items.map(([id,t,s])=>`<label class="chk"><input type="checkbox" data-k="${id}" ${d[id]?'checked':''}><span>${t}<small>${s}</small></span></label>`).join('')+`<div class="lbl">Water: ${d.water} of 10 glasses</div><div class="glasses">${Array.from({length:10},(_,i)=>`<button class="${i<d.water?'on':''}" data-g="${i+1}" aria-label="Glass ${i+1}"></button>`).join('')}</div>`;
+ $('today').querySelectorAll('[data-k]').forEach(e=>e.onchange=()=>{d[e.dataset.k]=e.checked;store.set(k,d)});
+ $('today').querySelectorAll('[data-g]').forEach(b=>b.onclick=()=>{const n=+b.dataset.g;d.water=d.water===n?n-1:n;store.set(k,d);render()});
+ // week
+ $('week').innerHTML=`<h2>Care this week</h2><ul>${T.care.map(x=>`<li>${x}</li>`).join('')}</ul><h2 style="margin-top:16px">What to eat</h2><ul>${T.eat.map(x=>`<li>${x}</li>`).join('')}</ul><p class="note">${avoid}</p>`;
+ // appts
+ const now=checks.filter(x=>w>=x.a&&w<=x.b),next=checks.filter(x=>x.a>w).slice(0,3);
+ const row=(x,n)=>`<div class="ap"><span class="pill ${n?'now':''}">${n?'Due now':'Coming up'}</span><strong>${x.t}</strong> <span class="note">weeks ${x.a===x.b?x.a:x.a+'–'+x.b}</span><small>${x.d}</small></div>`;
+ $('appts').innerHTML=`<h2>Checkups and tests</h2>`+(now.map(x=>row(x,1)).join('')+next.map(x=>row(x,0)).join('')||'<p>No tests are due. Keep attending your regular visits.</p>')+(w>=34?'<div class="ap"><span class="pill now">Do now</span><strong>Pack your hospital bag</strong><small>ID, medical papers, comfy clothes, baby clothes, phone charger</small></div>':'');
+ $('warn').innerHTML=`<h2>Call your doctor right away if you notice</h2><ul>${warns.map(x=>`<li>${x}</li>`).join('')}</ul><p class="note">In an emergency, go to the nearest hospital or call your local emergency number.</p>`;
+ renderRem();
+}
+function renderRem(){
+ const r=store.get('mc-rem')||{vit:'09:00',water:'11:00',walk:'17:00',on:false};
+ $('rem').innerHTML=`<h2>Daily reminders</h2><div class="row"><div><label for="r1">Vitamin</label><input type="time" id="r1" value="${r.vit}"></div><div><label for="r2">Water</label><input type="time" id="r2" value="${r.water}"></div><div><label for="r3">Walk</label><input type="time" id="r3" value="${r.walk}"></div></div><button id="rsave">${r.on?'Update reminders':'Turn on reminders'}</button><p class="note">${NATIVE?'Reminders arrive every day at these times, even when the app is closed.':'Reminders appear while this page is open. If your browser allows it, you also get a phone or desktop notification.'}</p>`;
+ $('rsave').onclick=async()=>{
+  const n={vit:$('r1').value,water:$('r2').value,walk:$('r3').value,on:true};store.set('mc-rem',n);
+  const ok=await scheduleNative(n);
+  if(!ok){try{if('Notification' in window&&Notification.permission==='default')await Notification.requestPermission()}catch(e){}}
+  toast(ok?'Reminders set. They arrive daily, even when the app is closed.':NATIVE?'Please allow notifications in your phone settings.':'Reminders saved. Keep this page open to receive them.');startTimer();renderRem();
+ };
+}
+function startTimer(){
+ clearInterval(timer);if(NATIVE)return;
+ const r=store.get('mc-rem');if(!r||!r.on)return;
+ const msg={vit:'Time for your prenatal vitamin.',water:'Drink a glass of water.',walk:'Take a gentle 30-minute walk.'};
+ timer=setInterval(()=>{
+  const n=new Date(),hm=String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0');
+  for(const key in msg){
+   const fk='mc-fired-'+key+n.toDateString();
+   if(r[key]===hm&&!store.get(fk)){store.set(fk,1);toast(msg[key]);
+    try{if('Notification' in window&&Notification.permission==='granted')new Notification('Mama Care',{body:msg[key]})}catch(e){}}
+  }
+ },20000);
+}
+$('save').onclick=()=>{
+ if(!$('date').value){toast('Pick a date first.');return}
+ st={mode:$('mode').value,date:$('date').value};store.set('mc-state',st);render();window.scrollTo(0,0);
+};
+$('reset').onclick=()=>{st=null;try{localStorage.removeItem('mc-state')}catch(e){}render()};
+render();startTimer();
+</script>
+</body>
+</html>
